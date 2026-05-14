@@ -1,8 +1,10 @@
 package com.woolam.memberprofileservice.member.service;
 
+import com.woolam.memberprofileservice.common.exception.BusinessException;
 import com.woolam.memberprofileservice.member.dto.request.MemberCreateRequest;
 import com.woolam.memberprofileservice.member.dto.response.MemberResponse;
 import com.woolam.memberprofileservice.member.entity.Member;
+import com.woolam.memberprofileservice.member.exception.MemberErrorCode;
 import com.woolam.memberprofileservice.member.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -27,7 +29,7 @@ public class MemberService {
     @Transactional(readOnly = true)
     public MemberResponse getMember(UUID id) {
         Member member = memberRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("member not found"));
+                .orElseThrow(() -> new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND));
 
         return MemberResponse.from(member);
     }
