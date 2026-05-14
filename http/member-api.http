@@ -1,0 +1,26 @@
+### 팀원 저장
+POST http://localhost:8080/api/members
+Content-Type: application/json
+
+{
+  "name": "홍길동",
+  "age": 29,
+  "mbti": "ISFJ"
+}
+
+### 팀원 조회
+# 팀원 저장 응답의 data.id 값을 아래 UUID 자리에 붙여 넣어 확인합니다.
+GET http://localhost:8080/api/members/00000000-0000-0000-0000-000000000000
+
+### 존재하지 않는 팀원 조회
+GET http://localhost:8080/api/members/11111111-1111-1111-1111-111111111111
+
+### 팀원 저장 실패 - 입력값 검증
+POST http://localhost:8080/api/members
+Content-Type: application/json
+
+{
+  "name": "",
+  "age": 0,
+  "mbti": ""
+}
