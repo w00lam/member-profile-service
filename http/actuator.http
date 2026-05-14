@@ -1,0 +1,6 @@
+### Actuator 헬스 체크
+GET http://localhost:8080/actuator/health
+
+### Actuator info
+GET http://localhost:8080/actuator/info
+
