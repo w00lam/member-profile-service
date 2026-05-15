@@ -24,3 +24,8 @@ spring:
 logging:
   level:
     root: info
+
+cloud:
+  aws:
+    s3:
+      bucket: local-member-profile-images
