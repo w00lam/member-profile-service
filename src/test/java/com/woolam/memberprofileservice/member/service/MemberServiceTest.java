@@ -1,7 +1,10 @@
 package com.woolam.memberprofileservice.member.service;
 
 import com.woolam.memberprofileservice.common.exception.BusinessException;
+import com.woolam.memberprofileservice.common.s3.S3ProfileImageService;
 import com.woolam.memberprofileservice.member.dto.request.MemberCreateRequest;
+import com.woolam.memberprofileservice.member.dto.response.ProfileImageResponse;
+import com.woolam.memberprofileservice.member.dto.response.ProfileImageUploadResponse;
 import com.woolam.memberprofileservice.member.dto.response.MemberResponse;
 import com.woolam.memberprofileservice.member.entity.Member;
 import com.woolam.memberprofileservice.member.exception.MemberErrorCode;
@@ -12,6 +15,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockMultipartFile;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -30,6 +34,9 @@ class MemberServiceTest {
 
     @Mock
     private MemberRepository memberRepository;
+
+    @Mock
+    private S3ProfileImageService s3ProfileImageService;
 
     @Test
     void createMember() {
@@ -77,5 +84,68 @@ class MemberServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(MemberErrorCode.MEMBER_NOT_FOUND);
+    }
+
+    @Test
+    void uploadProfileImage() {
+        Member member = Member.create("홍길동", 29, "ISFJ");
+        MockMultipartFile file = new MockMultipartFile(
+                "image",
+                "profile.png",
+                "image/png",
+                "image".getBytes()
+        );
+        String profileImageKey = "profile-images/%s/test-profile.png".formatted(member.getId());
+        given(memberRepository.findById(member.getId()))
+                .willReturn(Optional.of(member));
+        given(s3ProfileImageService.upload(member.getId(), file))
+                .willReturn(profileImageKey);
+
+        ProfileImageUploadResponse response = memberService.uploadProfileImage(member.getId(), file);
+
+        assertThat(response.profileImageKey()).isEqualTo(profileImageKey);
+        assertThat(member.getProfileImageKey()).isEqualTo(profileImageKey);
+    }
+
+    @Test
+    void uploadProfileImageThrowsExceptionWhenFileIsEmpty() {
+        Member member = Member.create("홍길동", 29, "ISFJ");
+        MockMultipartFile emptyFile = new MockMultipartFile(
+                "image",
+                "profile.png",
+                "image/png",
+                new byte[0]
+        );
+
+        assertThatThrownBy(() -> memberService.uploadProfileImage(member.getId(), emptyFile))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(MemberErrorCode.EMPTY_PROFILE_IMAGE);
+    }
+
+    @Test
+    void getProfileImageUrl() {
+        Member member = Member.create("홍길동", 29, "ISFJ");
+        member.updateProfileImageKey("profile-images/%s/profile.png".formatted(member.getId()));
+        given(memberRepository.findById(member.getId()))
+                .willReturn(Optional.of(member));
+        given(s3ProfileImageService.createPresignedUrl(member.getProfileImageKey()))
+                .willReturn("https://example.com/profile.png");
+
+        ProfileImageResponse response = memberService.getProfileImageUrl(member.getId());
+
+        assertThat(response.presignedUrl()).isEqualTo("https://example.com/profile.png");
+    }
+
+    @Test
+    void getProfileImageUrlThrowsExceptionWhenProfileImageDoesNotExist() {
+        Member member = Member.create("홍길동", 29, "ISFJ");
+        given(memberRepository.findById(member.getId()))
+                .willReturn(Optional.of(member));
+
+        assertThatThrownBy(() -> memberService.getProfileImageUrl(member.getId()))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(MemberErrorCode.PROFILE_IMAGE_NOT_FOUND);
     }
 }
