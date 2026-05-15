@@ -2,6 +2,11 @@ spring:
   config:
     activate:
       on-profile: prod
+    import: aws-parameterstore:/member-profile-service/prod/
+  cloud:
+    aws:
+      parameterstore:
+        region: ap-northeast-2
   datasource:
     url: ${DB_URL}
     username: ${DB_USERNAME}
