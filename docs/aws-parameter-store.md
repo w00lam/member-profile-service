@@ -18,6 +18,7 @@
 | `/member-profile-service/prod/DB_USERNAME` | RDS 사용자명 |
 | `/member-profile-service/prod/DB_PASSWORD` | RDS 비밀번호 |
 | `/member-profile-service/prod/TEAM_NAME` | `/actuator/info` 확인용 팀 이름 |
+| `/member-profile-service/prod/S3_BUCKET` | 프로필 이미지 저장용 S3 버킷 이름 |
 
 이 값들은 `application-prod.yaml`에서 아래 설정으로 참조합니다.
 
@@ -32,6 +33,11 @@ spring:
 
 info:
   team-name: ${TEAM_NAME}
+
+cloud:
+  aws:
+    s3:
+      bucket: ${S3_BUCKET}
 ```
 
 ## AWS CLI 예시
@@ -60,6 +66,12 @@ aws ssm put-parameter \
   --type "String" \
   --value "<team-name>" \
   --overwrite
+
+aws ssm put-parameter \
+  --name "/member-profile-service/prod/S3_BUCKET" \
+  --type "String" \
+  --value "<s3-bucket-name>" \
+  --overwrite
 ```
 
 ## EC2 IAM 권한
@@ -84,6 +96,24 @@ EC2 인스턴스에 연결된 IAM Role에는 최소한 아래 권한이 필요�
 ```
 
 `DB_PASSWORD`를 `SecureString`으로 저장한 경우 KMS 키 정책에 따라 `kms:Decrypt` 권한이 추가로 필요할 수 있습니다.
+
+S3 업로드와 Presigned URL 생성을 위해 EC2 IAM Role에는 S3 객체 권한도 필요합니다.
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject",
+        "s3:GetObject"
+      ],
+      "Resource": "arn:aws:s3:::<s3-bucket-name>/profile-images/*"
+    }
+  ]
+}
+```
 
 ## 운영 실행
 
