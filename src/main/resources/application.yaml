@@ -3,6 +3,10 @@ spring:
     name: member-profile-service
   profiles:
     default: local
+  cloud:
+    aws:
+      region:
+        static: ap-northeast-2
 
 management:
   endpoints:

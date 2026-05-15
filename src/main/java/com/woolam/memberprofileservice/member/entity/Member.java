@@ -29,7 +29,13 @@ public class Member {
     @Column(nullable = false)
     private String mbti;
 
+    private String profileImageKey;
+
     public static Member create(String name, Integer age, String mbti) {
-        return new Member(UUID.randomUUID(), name, age, mbti);
+        return new Member(UUID.randomUUID(), name, age, mbti, null);
+    }
+
+    public void updateProfileImageKey(String profileImageKey) {
+        this.profileImageKey = profileImageKey;
     }
 }

@@ -2,6 +2,8 @@ package com.woolam.memberprofileservice.member.controller;
 
 import com.woolam.memberprofileservice.common.response.ApiResponse;
 import com.woolam.memberprofileservice.member.dto.request.MemberCreateRequest;
+import com.woolam.memberprofileservice.member.dto.response.ProfileImageResponse;
+import com.woolam.memberprofileservice.member.dto.response.ProfileImageUploadResponse;
 import com.woolam.memberprofileservice.member.dto.response.MemberResponse;
 import com.woolam.memberprofileservice.member.service.MemberService;
 import jakarta.validation.Valid;
@@ -9,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.UUID;
 
@@ -32,5 +35,22 @@ public class MemberController {
         MemberResponse response = memberService.getMember(id);
 
         return ApiResponse.success("팀원 조회 성공", response);
+    }
+
+    @PostMapping("/{id}/profile-image")
+    public ApiResponse<ProfileImageUploadResponse> uploadProfileImage(
+            @PathVariable UUID id,
+            @RequestPart("image") MultipartFile image
+    ) {
+        ProfileImageUploadResponse response = memberService.uploadProfileImage(id, image);
+
+        return ApiResponse.success("프로필 이미지 업로드 성공", response);
+    }
+
+    @GetMapping("/{id}/profile-image")
+    public ApiResponse<ProfileImageResponse> getProfileImage(@PathVariable UUID id) {
+        ProfileImageResponse response = memberService.getProfileImageUrl(id);
+
+        return ApiResponse.success("프로필 이미지 조회 성공", response);
     }
 }

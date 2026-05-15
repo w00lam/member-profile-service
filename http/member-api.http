@@ -24,3 +24,19 @@ Content-Type: application/json
   "age": 0,
   "mbti": ""
 }
+
+### 프로필 이미지 업로드
+# 팀원 저장 응답의 data.id 값을 아래 UUID 자리에 붙여 넣어 확인합니다.
+POST http://localhost:8080/api/members/00000000-0000-0000-0000-000000000000/profile-image
+Content-Type: multipart/form-data; boundary=profile-image-boundary
+
+--profile-image-boundary
+Content-Disposition: form-data; name="image"; filename="profile.png"
+Content-Type: image/png
+
+sample-image-content
+--profile-image-boundary--
+
+### 프로필 이미지 Presigned URL 조회
+# Presigned URL 유효기간은 7일입니다.
+GET http://localhost:8080/api/members/00000000-0000-0000-0000-000000000000/profile-image
