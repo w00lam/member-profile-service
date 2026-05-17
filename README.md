@@ -17,8 +17,7 @@
 
 클라우드 실습 중 가장 중요한 비용 관리를 위해 AWS Budgets를 설정했습니다. 월 예산을 $100로 설정하고, 예산의 80% 도달 시 이메일 알림이 오도록 구성했습니다.
 
-*   **설정 요구사항**: 월 예산 $100, 80% 도달 시 이메일 알림
-*   **제출 요구사항**: 설정 완료된 AWS Budgets 화면 캡처
+![AWS Budget 설정](docs/images/aws-budget.png)
 
 ### LV 1 - 네트워크 구축 및 핵심 기능 배포
 
@@ -31,9 +30,10 @@
     *   팀원 정보 저장 및 조회 API 개발 (`POST /api/members`, `GET /api/members/{id}`)
     *   로컬은 H2, 운영은 MySQL을 사용하도록 `application.yml`을 `local/prod`로 분리
     *   API 요청 시 `INFO` 레벨 로그, 예외 발생 시 `ERROR` 레벨 스택트레이스 로그 남기기
-    *   `spring-boot-starter-actuator` 의존성 추가 및 헬스 체크 엔드포인트 노출 (`management.endpoints.web.exposure.include=health`)
+    *   `spring-boot-starter-actuator` 의존성 추가 및 헬스 체크 엔드포인트 노출
 *   **배포 및 검증**: EC2에 프로젝트 배포 및 실행, `/actuator/health` 엔드포인트 응답 확인
-*   **제출 요구사항**: 설정 완료된 EC2의 퍼블릭 IP
+
+![EC2 헬스 체크](docs/images/ec2-health-check.png)
 
 ### LV 2 - DB 분리 및 보안 연결
 
@@ -42,28 +42,26 @@ DB 비밀번호를 코드에 직접 노출하지 않고, AWS 관리형 서비스
 *   **인프라 요구사항**
     *   로컬 접속용 Public Subnet에 MySQL RDS 생성
     *   RDS 보안 그룹(Inbound)에 EC2의 보안 그룹 ID만 허용하는 보안 그룹 체이닝 설정
-    *   DB 접속 정보(`url`, `username`, `password`) 및 확인용 파라미터를 Parameter Store에 저장
+    *   DB 접속 정보 및 확인용 파라미터를 Parameter Store에 저장
 *   **애플리케이션 요구사항**
     *   Spring Boot 실행 시 Parameter Store 값을 주입받아 RDS에 연결
     *   Parameter Store에 저장한 `team-name` 값이 `/actuator/info` 엔드포인트에서 조회되도록 Actuator Info 확장
-*   **검증**: `http://{EC2_Public_IP}:8080/actuator/info` 접속 시 팀 이름 출력 확인
-*   **제출 요구사항**
-    *   Actuator Info 엔드포인트 URL
-    *   RDS 보안 그룹 인바운드 규칙 스크린샷 (EC2 보안 그룹 ID가 등록된 화면)
+
+![RDS 보안 그룹 체이닝](docs/images/ec2-rds-security-group-chaining.png)
+![Actuator Info 응답](docs/images/actuator-info-response.png)
 
 ### LV 3 - 프로필 사진 기능 추가와 권한 관리
 
 팀원 정보에 프로필 사진 기능을 추가하고, 서버 디스크가 아닌 S3를 사용하여 데이터의 안전성을 확보합니다.
 
 *   **인프라 요구사항**
-    *   "모든 퍼블릭 액세스 차단" 설정이 켜진 S3 버킷 생성
-    *   S3 접근 권한이 있는 IAM Role 생성 및 EC2에 연결 (Access Key 미사용) 또는 IAM Policy 적용
+    *   S3 버킷 생성 (퍼블릭 액세스 차단)
+    *   S3 접근 권한이 있는 IAM Role 생성 및 EC2에 연결
 *   **API 요구사항**
-    *   `POST /api/members/{id}/profile-image`: MultipartFile로 이미지를 받아 S3에 업로드하고, 이미지 URL을 DB에 업데이트
-    *   `GET /api/members/{id}/profile-image`: Presigned URL을 생성하여 반환 (유효기간 7일 설정)
-*   **제출 요구사항**
-    *   발급받은 Presigned URL 1개와 해당 URL의 만료 시간
-    *   (IAM Role 사용 시) 접근 성공 스크린샷
+    *   `POST /api/members/{id}/profile-image`: S3 이미지 업로드 및 URL DB 업데이트
+    *   `GET /api/members/{id}/profile-image`: Presigned URL 생성 (유효기간 7일)
+
+![Presigned URL 접속 성공](docs/images/presigned-url-access-success.png)
 
 ## 💡 도전 과제
 
@@ -71,39 +69,27 @@ DB 비밀번호를 코드에 직접 노출하지 않고, AWS 관리형 서비스
 
 애플리케이션을 컨테이너 환경으로 포장하고, 코드 푸시 한 번으로 배포까지 완료되는 자동화를 구축합니다.
 
-*   **Docker 도입**: `Dockerfile`을 작성하여 애플리케이션을 이미지로 빌드
-*   **Github Actions CI/CD**
-    *   `.github/workflows/deploy.yml` 작성
-    *   **CI**: Main 브랜치 푸시 시 Build & Test 수행
-    *   **CD**: 빌드된 이미지를 Docker Hub에 Push, EC2에서 `docker pull` 명령어로 이미지 받아 실행
-*   **검증**: 코드를 수정하여 Github에 Push 했을 때, EC2에 자동으로 반영되는지 확인
-*   **제출 요구사항**
-    *   Github Actions 성공 이미지 (초록색 체크 표시)
-    *   EC2 터미널 이미지 (`sudo docker ps` 명령어로 실행 중인 컨테이너 목록 확인)
+*   **Docker 도입**: `Dockerfile` 작성 및 이미지 빌드
+*   **Github Actions CI/CD**: Main 브랜치 푸시 시 빌드, 테스트 및 Docker Hub 푸시, EC2 자동 배포
+
+![Github Actions 성공](docs/images/github-actions-cicd-success.png)
+![EC2 Docker 컨테이너 실행](docs/images/docker-container-running-on-ec2.png)
 
 ### LV 5 - 고가용성 아키텍처와 보안 도메인 연결 (ALB + ASG + HTTPS)
 
 트래픽 급증에 대비한 확장성(Auto Scaling)과 보안(HTTPS)을 확보하고, 외우기 쉬운 도메인을 연결합니다.
 
-*   **NAT Gateway 생성**: Public Subnet에 NAT Gateway 생성, Private Subnet 라우팅 테이블 수정
-*   **RDS & EC2 이사**: Public Subnet에 있던 RDS & EC2를 Private Subnet 환경으로 재구성
-*   **도메인 구입 및 인증서 발급**: AWS Route 53에서 도메인 구입 및 호스팅 영역 생성, AWS ACM에서 SSL 인증서 발급
-*   **로드 밸런서(ALB) 및 Auto Scaling 구성**
-    *   **ALB**: EC2 앞단에 배치, HTTPS(443) 리스너에 인증서 적용, HTTP(80) 요청 HTTPS로 리다이렉트
-    *   **ASG**: 시작 템플릿 작성, ALB와 연결된 Auto Scaling Group 생성 (트래픽/CPU 사용량에 따라 EC2 자동 생성/삭제)
-*   **도메인 연결**: AWS Route 53에서 A 레코드를 생성하여 도메인 주소가 ALB DNS 주소를 가리키도록 설정
-*   **제출 요구사항**
-    *   HTTPS 적용된 도메인 URL
-    *   Target Group(대상 그룹) 이미지 (Registered targets에 인스턴스가 등록되어 있고 Healthy 상태인 화면)
+*   **NAT Gateway 및 Private Subnet**: 보안 강화를 위해 RDS & EC2를 Private Subnet으로 이동
+*   **ALB & ASG**: HTTPS 적용 및 트래픽에 따른 자동 확장 구성
+*   **Route 53 & ACM**: 도메인 연결 및 SSL 인증서 적용
 
 ### LV 6 - 글로벌 성능 최적화 (CloudFront CDN)
 
 전 세계 어디서든 프로필 사진을 빠르게 볼 수 있도록 CDN을 적용합니다.
 
-*   **CloudFront 구축**: S3 버킷을 원본으로 하는 CloudFront 배포 생성
-*   **검증**: CloudFront 도메인을 통해 이미지가 정상적으로 로딩되는지 확인
-*   **제출 요구사항**
-    *   CloudFront 이미지 URL (`https://dxxxxxxx.cloudfront.net/...` 형식)
+*   **CloudFront 구축**: S3 원본 CloudFront 배포 생성 및 도메인을 통한 이미지 조회
+
+![CloudFront 이미지 조회](docs/images/cloudfront-image.png)
 
 ## 🛠️ 트러블슈팅 및 학습 경험
 
@@ -138,17 +124,5 @@ ALB Health Check가 계속 실패하여 Spring Boot 설정, Actuator 설정, 컨
 ### 7. 파일 업로드 API를 구현하면서 HTTP Multipart 구조를 이해하게 된 점
 
 프로필 이미지 업로드 API 구현 시 `@RequestParam MultipartFile`만 고려했으나, 파일 업로드가 `multipart/form-data` 구조이며 요청 내부가 여러 개의 part로 나뉜다는 점을 이해하게 되었습니다. 이후 `@RequestPart("image") MultipartFile image` 형태로 명확하게 처리했으며, JSON과 파일 동시 업로드 구조를 고려할 때 `@RequestPart`가 의미 전달, 유지보수성, 요청 구조 명확성 측면에서 더 적절하다고 판단했습니다.
-
-## 📝 과제 제출 요구사항 (README.md 포함 내용)
-
-과제 제출 시 `README.md`에 반드시 포함되어야 하는 정보는 다음과 같습니다.
-
-*   **LV 0**: 설정 완료된 AWS Budgets 화면 캡처
-*   **LV 1**: 설정 완료된 EC2의 퍼블릭 IP
-*   **LV 2**: Actuator Info 엔드포인트 URL, RDS 보안 그룹 인바운드 규칙 스크린샷
-*   **LV 3**: 발급받은 Presigned URL 1개와 해당 URL의 만료 시간 (IAM Role 사용 시 접근 성공 스크린샷)
-*   **LV 4**: Github Actions 성공 이미지 (초록색 체크 표시), EC2 터미널 이미지 (`sudo docker ps` 결과)
-*   **LV 5**: HTTPS 적용된 도메인 URL, Target Group(대상 그룹) 이미지
-*   **LV 6**: CloudFront 이미지 URL
 
 ---
