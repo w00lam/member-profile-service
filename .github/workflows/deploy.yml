@@ -50,6 +50,13 @@ jobs:
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
+            if ! command -v docker >/dev/null 2>&1; then
+              sudo dnf update -y
+              sudo dnf install -y docker
+              sudo systemctl start docker
+              sudo systemctl enable docker
+            fi
+
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/member-profile-service:latest
             docker stop member-profile-service || true
             docker rm member-profile-service || true
