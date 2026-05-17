@@ -37,10 +37,10 @@ GET /api/members/{id}/profile-image
 
 운영 환경은 `ddl-auto=validate`를 사용하므로 애플리케이션 실행 전에 DB 스키마가 엔티티와 일치해야 합니다.
 
-처음 배포하는 경우에는 엔티티 기준으로 전체 테이블을 생성한 뒤 실행하면 됩니다. 이미 `member` 테이블이 존재하는 운영 DB에 프로필 이미지 기능만 추가 배포하는 경우에는 아래 컬럼이 필요합니다.
+처음 배포하는 경우에는 엔티티 기준으로 전체 테이블을 생성한 뒤 실행하면 됩니다. 이미 `members` 테이블이 존재하는 운영 DB에 프로필 이미지 기능만 추가 배포하는 경우에는 아래 컬럼이 필요합니다.
 
 ```sql
-ALTER TABLE member
+ALTER TABLE members
     ADD COLUMN profile_image_key VARCHAR(255) NULL;
 ```
 
