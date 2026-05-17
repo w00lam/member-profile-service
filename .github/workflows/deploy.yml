@@ -57,10 +57,10 @@ jobs:
               sudo systemctl enable docker
             fi
 
-            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/member-profile-service:latest
-            docker stop member-profile-service || true
-            docker rm member-profile-service || true
-            docker run -d \
+            sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/member-profile-service:latest
+            sudo docker stop member-profile-service || true
+            sudo docker rm member-profile-service || true
+            sudo docker run -d \
               --name member-profile-service \
               --restart unless-stopped \
               -p 8080:8080 \
