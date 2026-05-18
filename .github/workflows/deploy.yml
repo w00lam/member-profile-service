@@ -1,0 +1,69 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: corretto
+          java-version: '21'
+          cache: gradle
+
+      - name: Grant execute permission for Gradle
+        run: chmod +x ./gradlew
+
+      - name: Build and test
+        run: ./gradlew clean build
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          platforms: linux/arm64
+          no-cache: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/member-profile-service:latest
+
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            if ! command -v docker >/dev/null 2>&1; then
+              sudo dnf update -y
+              sudo dnf install -y docker
+              sudo systemctl start docker
+              sudo systemctl enable docker
+            fi
+
+            sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/member-profile-service:latest
+            sudo docker stop member-profile-service || true
+            sudo docker rm member-profile-service || true
+            sudo docker run -d \
+              --name member-profile-service \
+              --restart unless-stopped \
+              -p 8080:8080 \
+              -e SPRING_PROFILES_ACTIVE=prod \
+              ${{ secrets.DOCKERHUB_USERNAME }}/member-profile-service:latest
