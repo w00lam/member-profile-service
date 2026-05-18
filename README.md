@@ -4,6 +4,8 @@
 
 이 프로젝트는 스타트업 백엔드 개발자로서 팀원들의 정보를 저장하고 프로필 사진을 업로드하는 API를 구축하고, 이를 AWS 상에서 안전하고 중단 없이 운영하는 것을 목표로 합니다. 아무것도 없는 상태에서 네트워크를 구축하고, DB와 파일 저장소를 분리하여 "서버가 죽어도 데이터가 안전한" Stateless 아키텍처를 완성하는 데 중점을 두었습니다.
 
+상세한 트러블슈팅 과정과 기술적 고민은 [블로그 포스팅: 실전 클라우드 배포와 운영](https://w00lam.github.io/posts/cloud-deployment-troubleshooting/)에서도 확인하실 수 있습니다.
+
 ### 기술 스택
 
 *   **백엔드**: Spring Boot 3.x, Java 21, Gradle
@@ -83,6 +85,9 @@ DB 비밀번호를 코드에 직접 노출하지 않고, AWS 관리형 서비스
 *   **ALB & ASG**: HTTPS 적용 및 트래픽에 따른 자동 확장 구성
 *   **Route 53 & ACM**: 도메인 연결 및 SSL 인증서 적용
 
+![ALB Target Group Healthy](docs/images/alb-targetgroup-healthy.png)
+![HTTPS 적용 및 Health Check](docs/images/https-actuator-health.png)
+
 ### LV 6 - 글로벌 성능 최적화 (CloudFront CDN)
 
 전 세계 어디서든 프로필 사진을 빠르게 볼 수 있도록 CDN을 적용합니다.
@@ -95,34 +100,35 @@ DB 비밀번호를 코드에 직접 노출하지 않고, AWS 관리형 서비스
 
 프로젝트를 진행하면서 마주했던 주요 문제 상황과 해결 과정, 그리고 이를 통해 얻은 학습 경험을 공유합니다.
 
-### 1. UUID를 사용한 이유와 저장 방식에 대한 고민
+### 1. ID 전략 및 데이터 설계 고민: UUID 도입
 
-일반적인 `Long` Auto Increment ID 대신 `UUID` 기반으로 회원 ID를 구현했습니다. 이는 클라우드 기반의 확장 가능한 환경을 고려한 선택이었습니다. UUID는 애플리케이션 레벨에서 고유 ID를 생성하여 여러 서버 인스턴스에서 ID 충돌 가능성을 낮추고, 데이터 생성 순서 노출 및 리소스 ID 예측 가능성 문제를 방지합니다.
+일반적인 `Long` Auto Increment ID 대신 `UUID` 기반으로 회원 ID를 구현했습니다. 이는 클라우드 기반의 확장 가능한 환경을 고려한 선택이었습니다. 
 
-저장 방식으로는 `BINARY(16)` 대신 `CHAR(36)` 기반 문자열 형태를 선택했습니다. `BINARY(16)`이 저장 공간 및 인덱스 효율 측면에서 유리하지만, 이번 프로젝트는 대규모 트래픽 최적화보다는 클라우드 인프라 구성, 운영 환경 경험, 장애 분석 및 디버깅에 초점이 맞춰져 있었기 때문에, DB 조회 시 가독성, 로그 분석 편의성, 운영 중 디버깅 용이성을 우선했습니다.
+*   **UUID를 선택한 이유**: 애플리케이션 레벨에서 고유 ID를 생성하여 여러 서버 인스턴스에서 ID 충돌 가능성을 낮추고, 데이터 생성 순서 노출 및 리소스 ID 예측 가능성 문제를 방지하기 위함입니다.
+*   **저장 방식 고민**: `BINARY(16)`이 효율적이지만, 운영 중 DB 조회 가독성과 디버깅 편의성을 위해 `CHAR(36)` 문자열 방식을 선택했습니다.
 
-### 2. 에러 코드를 도메인별로 분리한 이유
+### 2. 유지보수성 고려: 에러 코드를 도메인별로 분리한 이유
 
-이전 프로젝트에서 모든 에러 코드를 하나의 `ErrorCode`에서 관리했을 때 발생했던 Git 충돌, 파일 크기 증가, 도메인 경계 모호화 등의 문제를 해결하기 위해 에러 코드를 도메인별로 분리했습니다. 현재는 `MemberErrorCode`를 별도로 관리하며, 향후 `AuthErrorCode`, `StorageErrorCode` 등으로 확장할 계획입니다. 이를 통해 Git 충돌 감소, 도메인 책임 분리, 에러 관리 가독성 향상, 유지보수성 개선 효과를 기대합니다.
+이전 프로젝트에서 모든 에러 코드를 하나의 `ErrorCode`에서 관리했을 때 발생했던 Git 충돌과 도메인 경계 모호화 문제를 해결하기 위해 에러 코드를 도메인별로 분리했습니다. 현재 `MemberErrorCode`를 독립적으로 관리하며, 이를 통해 도메인 책임 분리와 유지보수성을 개선했습니다.
 
 ### 3. 로컬에서는 정상인데 운영 환경(RDS)에서만 실패했던 UUID 문제
 
-회원 생성 API가 로컬(H2)에서는 정상 동작했지만, AWS RDS(MySQL) 환경에서 `Incorrect string value` 에러가 발생했습니다. 이는 Hibernate 7의 UUID 저장 전략과 MySQL 컬럼 타입 불일치(DB는 `CHAR(36)`을 기대했지만 Hibernate는 `BINARY(16)`으로 처리) 때문이었습니다. 이 경험을 통해 Hibernate 기본 매핑 전략, DB Dialect 차이, 실제 운영 DB 동작 방식까지 함께 고려해야 함을 배웠고, 운영 환경과 최대한 유사한 환경에서 테스트하는 중요성을 깨달았습니다.
+회원 생성 API가 로컬(H2)에서는 정상 동작했지만, AWS RDS(MySQL) 환경에서 `Incorrect string value` 에러가 발생했습니다. Hibernate 7의 UUID 저장 전략과 MySQL 컬럼 타입 불일치(`CHAR(36)` vs `BINARY(16)`)가 원인이었으며, 이를 통해 Hibernate 매핑 전략과 DB Dialect 차이를 실제 운영 DB 관점에서 고려해야 함을 배웠습니다.
 
 ### 4. Gradle Daemon 때문에 발생했던 Java 21 인식 문제
 
-EC2에서 Spring Boot 프로젝트 빌드 중 `Cannot find a Java installation on your machine matching: {languageVersion=21}` 에러가 발생했습니다. Java 21이 설치되어 있었음에도 불구하고 발생한 이 문제는 Gradle Daemon이 이전 JDK 환경 정보를 캐싱하고 있었기 때문이었습니다. `./gradlew --stop` 명령어로 Daemon을 재시작하여 해결했으며, `java -version` 뿐만 아니라 `javac -version`까지 함께 확인해야 함을 배웠습니다.
+EC2에서 빌드 중 Java 21 설치 상태임에도 JDK를 찾지 못하는 에러가 발생했습니다. 원인은 Gradle Daemon의 이전 환경 정보 캐싱이었으며, `./gradlew --stop`으로 Daemon을 재시작하여 해결했습니다. 이 과정을 통해 `javac -version` 확인 및 빌드 툴의 캐시 메커니즘 이해의 중요성을 깨달았습니다.
 
-### 5. Docker는 “어디서든 실행된다”가 아니라 아키텍처도 맞아야 한다는 점
+### 5. Docker 아키텍처 불일치 문제 (amd64 vs arm64)
 
-GitHub Actions 기반 CI/CD 구축 후 Docker 이미지는 정상 배포되었으나, EC2에서 컨테이너가 `exec format error`와 함께 계속 재시작되는 문제가 있었습니다. 원인은 GitHub Actions 빌드 환경(`linux/amd64`)과 EC2 실행 환경(`ARM64(aarch64)`) 간의 아키텍처 불일치였습니다. GitHub Actions에서 `platforms: linux/arm64`로 빌드 플랫폼을 명시하여 해결했으며, CI/CD 구축 시 실행 환경의 CPU 아키텍처까지 고려해야 함을 체감했습니다.
+GitHub Actions에서 빌드한 Docker 이미지가 EC2에서 `exec format error`로 실행되지 않는 문제를 겪었습니다. 빌드 환경(`amd64`)과 실행 환경(`arm64`)의 아키텍처 차이가 원인이었으며, 빌드 플랫폼을 `linux/arm64`로 명시하여 해결했습니다. Docker가 "어디서든 실행된다"는 원칙 뒤에 CPU 아키텍처 호환성이 전제되어야 함을 체감했습니다.
 
 ### 6. ALB Target Group이 Unhealthy였던 원인
 
-ALB Health Check가 계속 실패하여 Spring Boot 설정, Actuator 설정, 컨테이너 문제 등을 의심했습니다. 하지만 실제 원인은 EC2와 RDS 간의 연결 실패, 즉 RDS Security Group 설정 오류였습니다. `Private EC2 SG → RDS SG : 3306 허용` 구조가 되어야 했으나, RDS가 다른 Security Group을 허용하고 있어 Spring Boot 부팅 실패, `/actuator/health` 실패로 이어졌습니다. RDS 인바운드 규칙을 EC2 Security Group 기준으로 수정한 뒤 해결되었으며, 네트워크 구조, Security Group 체이닝, 애플리케이션 부팅 의존성까지 함께 고려해야 함을 배웠습니다.
+ALB Health Check 실패의 근본 원인이 Security Group 설정 오류로 인한 DB 연결 실패였음을 발견했습니다. `EC2 SG → RDS SG` 인바운드 규칙이 누락되어 애플리케이션 부팅이 실패했고, 이것이 연쇄적으로 ALB Health Check 실패로 이어졌습니다. 네트워크 보안 그룹 체이닝과 애플리케이션 의존성 구조를 전체적으로 조망하는 시야를 기를 수 있었습니다.
 
-### 7. 파일 업로드 API를 구현하면서 HTTP Multipart 구조를 이해하게 된 점
+### 7. HTTP Multipart 구조의 이해: @RequestPart 활용
 
-프로필 이미지 업로드 API 구현 시 `@RequestParam MultipartFile`만 고려했으나, 파일 업로드가 `multipart/form-data` 구조이며 요청 내부가 여러 개의 part로 나뉜다는 점을 이해하게 되었습니다. 이후 `@RequestPart("image") MultipartFile image` 형태로 명확하게 처리했으며, JSON과 파일 동시 업로드 구조를 고려할 때 `@RequestPart`가 의미 전달, 유지보수성, 요청 구조 명확성 측면에서 더 적절하다고 판단했습니다.
+프로필 이미지 업로드 API 구현 시 `multipart/form-data` 구조를 깊이 있게 학습했습니다. 단순 `@RequestParam` 대신 `@RequestPart`를 사용하여 요청 구조를 명확히 하고, 향후 JSON과 파일을 동시에 처리하는 확장성 있는 API 구조를 설계하는 경험을 쌓았습니다.
 
 ---
